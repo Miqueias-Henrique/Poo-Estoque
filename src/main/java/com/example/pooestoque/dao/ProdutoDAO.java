@@ -1,69 +1,105 @@
 package com.example.pooestoque.dao;
 
 import com.example.pooestoque.model.Produto;
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ProdutoDAO {
-    private static final String ARQUIVO_CSV = "produtos.csv";
 
-    public ProdutoDAO() {
-        try {
-            if (!Files.exists(Paths.get(ARQUIVO_CSV))) {
-                Files.createFile(Paths.get(ARQUIVO_CSV));
+    // --- CONFIGURAÇÃO DE CONEXÃO ---
+    // Verifique se o nome do banco 'poo_estoque' está criado no DBeaver
+    private static final String URL = "jdbc:postgresql://localhost:5432/poo_estoque";
+    private static final String USER = "postgres";
+    private static final String PASS = "postgres"; // Sua senha do PostgreSQL
+
+    private Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(URL, USER, PASS);
+    }
+
+    // CREATE
+    public void salvarProduto(Produto produto) {
+        String sql = "INSERT INTO produtos (nome, preco, quantidade) VALUES (?, ?, ?)";
+
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            stmt.setString(1, produto.getNome());
+            // setDouble funciona perfeitamente com NUMERIC(10,2) no Postgres
+            stmt.setDouble(2, produto.getPreco());
+            stmt.setInt(3, produto.getQuantidade());
+
+            stmt.executeUpdate();
+
+            // Recupera o ID gerado (SERIAL)
+            try (ResultSet rs = stmt.getGeneratedKeys()) {
+                if (rs.next()) {
+                    produto.setId(rs.getInt(1));
+                }
             }
-        } catch (IOException e) { e.printStackTrace(); }
-    }
-
-    public void salvarProduto(Produto produto) throws IOException {
-        int novoId = carregarProximoId();
-        produto.setId(novoId);
-        try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(ARQUIVO_CSV), StandardOpenOption.APPEND)) {
-            writer.write(produto.toCSV());
-            writer.newLine();
+        } catch (SQLException e) {
+            tratarErro(e);
         }
     }
 
-    public List<Produto> listarProdutos() throws IOException {
-        List<Produto> produtos = new ArrayList<>();
-        List<String> linhas = Files.readAllLines(Paths.get(ARQUIVO_CSV));
-        for (String linha : linhas) {
-            if (!linha.trim().isEmpty()) produtos.add(Produto.fromCSV(linha));
-        }
-        return produtos;
-    }
+    // READ
+    public List<Produto> listarProdutos() {
+        List<Produto> lista = new ArrayList<>();
+        String sql = "SELECT * FROM produtos ORDER BY id ASC";
 
-    public void atualizarProduto(Produto editado) throws IOException {
-        List<Produto> lista = listarProdutos();
-        boolean achou = false;
-        for (int i = 0; i < lista.size(); i++) {
-            if (lista.get(i).getId() == editado.getId()) {
-                lista.set(i, editado);
-                achou = true;
-                break;
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                Produto p = new Produto(
+                        rs.getInt("id"),
+                        rs.getString("nome"),
+                        rs.getDouble("preco"), // O driver converte NUMERIC para double
+                        rs.getInt("quantidade")
+                );
+                lista.add(p);
             }
+        } catch (SQLException e) {
+            tratarErro(e);
         }
-        if (achou) reescreverArquivo(lista);
+        return lista;
     }
 
-    public void excluirProduto(int id) throws IOException {
-        List<Produto> lista = listarProdutos();
-        lista.removeIf(p -> p.getId() == id);
-        reescreverArquivo(lista);
-    }
+    // UPDATE
+    public void atualizarProduto(Produto p) {
+        String sql = "UPDATE produtos SET nome = ?, preco = ?, quantidade = ? WHERE id = ?";
 
-    public int carregarProximoId() throws IOException {
-        List<Produto> lista = listarProdutos();
-        return lista.isEmpty() ? 1 : lista.get(lista.size() - 1).getId() + 1;
-    }
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-    private void reescreverArquivo(List<Produto> lista) throws IOException {
-        try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(ARQUIVO_CSV), StandardOpenOption.TRUNCATE_EXISTING)) {
-            for (Produto p : lista) {
-                writer.write(p.toCSV());
-                writer.newLine();
-            }
+            stmt.setString(1, p.getNome());
+            stmt.setDouble(2, p.getPreco());
+            stmt.setInt(3, p.getQuantidade());
+            stmt.setInt(4, p.getId());
+
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            tratarErro(e);
         }
+    }
+
+    // DELETE
+    public void excluirProduto(int id) {
+        String sql = "DELETE FROM produtos WHERE id = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, id);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            tratarErro(e);
+        }
+    }
+
+    private void tratarErro(SQLException e) {
+        e.printStackTrace();
+        throw new RuntimeException("Erro de Banco de Dados: " + e.getMessage());
     }
 }

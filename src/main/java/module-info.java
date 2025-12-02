@@ -1,11 +1,14 @@
 module com.example.pooestoque {
     requires javafx.controls;
     requires javafx.fxml;
-    requires static lombok; // Necessário para o Lombok funcionar
+    requires static lombok;
 
-    // Exporta o pacote principal para o JavaFX iniciar
+    // NOVOS REQUERIMENTOS
+    requires java.sql;
+    requires org.postgresql.jdbc;
+
     exports com.example.pooestoque;
 
-    // Permite que o JavaFX (TableView) leia os atributos de Produto via reflexão
+    // Permite que o JavaFX leia os dados da classe Produto
     opens com.example.pooestoque.model to javafx.base;
 }
