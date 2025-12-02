@@ -11,7 +11,7 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 
-public class HelloApplication extends Application {
+public class Tela extends Application {
 
     private ProdutoDAO produtoDAO = new ProdutoDAO();
     private TableView<Produto> tabela = new TableView<>();
