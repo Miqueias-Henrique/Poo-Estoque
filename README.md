@@ -1,4 +1,4 @@
-# Poo-Estoque
+# controle-estoque-javafx
 
 Aplicação desktop em JavaFX para controle de estoque com persistência em PostgreSQL utilizando JDBC e o padrão DAO.
 
